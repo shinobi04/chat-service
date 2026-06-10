@@ -18,5 +18,14 @@ def generate_chat_response(messages: List[Dict[str, str]], image_base64: Optiona
         if last_msg["role"] == "user":
             last_msg["images"] = [image_base64]
 
-    response = client.chat(model=MODEL_NAME, messages=messages)
+    # We add strict options to prevent the model from "blurting" or hallucinating.
+    # Lower temperature = more focused and deterministic responses.
+    response = client.chat(
+        model=MODEL_NAME, 
+        messages=messages,
+        options={
+            "temperature": 0.2,
+            "top_p": 0.9
+        }
+    )
     return response['message']['content']

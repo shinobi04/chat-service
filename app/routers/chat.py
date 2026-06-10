@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, Form
 from sqlalchemy.orm import Session
 from uuid import UUID
 from typing import Optional
+import base64
 
 from app.database import get_db
 from app.models import Conversation, Message, RoleEnum
-from app.schemas import ChatRequest, ChatResponse
+from app.schemas import ChatResponse
 from app.core.security import verify_session_jwt
 from app.services.ollama_service import generate_chat_response
 
@@ -13,7 +14,8 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 @router.post("", response_model=ChatResponse)
 def handle_chat(
-    request: ChatRequest,
+    content: str = Form(..., description="The text message for the AI"),
+    image: Optional[UploadFile] = File(None, description="Optional image file to upload"),
     conversation_id: Optional[UUID] = Query(None, description="Provide this to continue an existing conversation"),
     db: Session = Depends(get_db),
     session_id: str = Depends(verify_session_jwt)
@@ -31,18 +33,24 @@ def handle_chat(
             raise HTTPException(status_code=404, detail="Conversation not found")
     else:
         # Create a new conversation
-        title = request.content[:30] + "..." if len(request.content) > 30 else request.content
+        title = content[:30] + "..." if len(content) > 30 else content
         conversation = Conversation(session_id=session_id, title=title)
         db.add(conversation)
         db.commit()
         db.refresh(conversation)
 
+    # Convert uploaded file to base64 for Ollama
+    image_base64 = None
+    if image:
+        image_bytes = image.file.read()
+        image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+
     # Save user message
     user_message = Message(
         conversation_id=conversation.id,
         role=RoleEnum.user,
-        content=request.content,
-        image_path=None 
+        content=content,
+        image_path=image.filename if image else None 
     )
     db.add(user_message)
     db.commit()
@@ -54,7 +62,7 @@ def handle_chat(
     ollama_messages = [{"role": msg.role.value, "content": msg.content} for msg in history]
 
     try:
-        ai_response_text = generate_chat_response(messages=ollama_messages, image_base64=request.image_base64)
+        ai_response_text = generate_chat_response(messages=ollama_messages, image_base64=image_base64)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Inference error: {str(e)}")
 
