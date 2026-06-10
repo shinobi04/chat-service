@@ -11,6 +11,13 @@ services:
     environment:
       - PULL_HEAVY_MODEL=${PULL_HEAVY_MODEL:-false}
     entrypoint: ["/usr/bin/bash", "/init_ollama.sh"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
   app:
     build: .
