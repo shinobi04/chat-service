@@ -31,12 +31,12 @@ DOCKER_COMPOSE_BIN=$(which docker-compose 2>/dev/null || true)
 
 if [ -n "$DOCKER_BIN" ] && "$DOCKER_BIN" compose version >/dev/null 2>&1; then
   # Modern Docker Compose V2 Plugin Setup detected
-  START_CMD="$DOCKER_BIN compose up -d"
+  START_CMD="$DOCKER_BIN compose up"
   STOP_CMD="$DOCKER_BIN compose down"
   echo " -> Found Docker Compose V2 Integration: $DOCKER_BIN compose"
 elif [ -n "$DOCKER_COMPOSE_BIN" ]; then
   # Historical Legacy V1 standalone binary detected
-  START_CMD="$DOCKER_COMPOSE_BIN up -d"
+  START_CMD="$DOCKER_COMPOSE_BIN up"
   STOP_CMD="$DOCKER_COMPOSE_BIN down"
   echo " -> Found Standalone Docker Compose V1 Binary: $DOCKER_COMPOSE_BIN"
 else
@@ -69,14 +69,15 @@ cat <<EOF > /etc/systemd/system/chat-service.service
 Description=Automated Cloud Chat Service API & Ollama Core Supervisor
 Requires=docker.service
 After=docker.service
-Documentation=[https://docs.docker.com](https://docs.docker.com)
+Documentation=https://docs.docker.com
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
+Type=simple
 WorkingDirectory=$PROJECT_DIR
 ExecStart=$START_CMD
 ExecStop=$STOP_CMD
+Restart=on-failure
+RestartSec=10
 StandardOutput=journal
 StandardError=journal
 
