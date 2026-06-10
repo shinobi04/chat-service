@@ -8,6 +8,8 @@ services:
     volumes:
       - ollama_data:/root/.ollama
       - ./init_ollama.sh:/init_ollama.sh
+    environment:
+      - PULL_HEAVY_MODEL=${PULL_HEAVY_MODEL:-false}
     entrypoint: ["/usr/bin/bash", "/init_ollama.sh"]
 
   app:

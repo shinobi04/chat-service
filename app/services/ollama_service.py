@@ -7,7 +7,11 @@ client = ollama.Client(host=settings.OLLAMA_BASE_URL)
 
 MODEL_NAME = "gemma3:1b"
 
-def generate_chat_response_stream(messages: List[Dict[str, str]], image_base64: Optional[str] = None) -> Iterator[str]:
+def generate_chat_response_stream(
+    messages: List[Dict[str, str]], 
+    image_base64: Optional[str] = None,
+    model_name: str = MODEL_NAME
+) -> Iterator[str]:
     """
     Sends the conversation history to Ollama and yields the generated text chunks.
     messages format: [{"role": "user", "content": "hello"}]
@@ -21,7 +25,7 @@ def generate_chat_response_stream(messages: List[Dict[str, str]], image_base64: 
     # We add strict options to prevent the model from "blurting" or hallucinating.
     # Lower temperature = more focused and deterministic responses.
     response_stream = client.chat(
-        model=MODEL_NAME, 
+        model=model_name, 
         messages=messages,
         stream=True,
         options={
