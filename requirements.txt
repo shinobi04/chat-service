@@ -8,3 +8,4 @@ pydantic-settings
 ollama
 python-multipart
 PyJWT
+cachetoolscachetools
