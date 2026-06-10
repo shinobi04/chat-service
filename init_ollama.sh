@@ -3,9 +3,9 @@
 # Start ollama serve in the background
 ollama serve &
 
-# Wait for the server to be ready
+# Wait for the server to be ready using the native ollama CLI instead of curl
 echo "Waiting for Ollama to start..."
-while ! curl -s http://localhost:11434/api/tags > /dev/null; do
+while ! ollama list > /dev/null 2>&1; do
     sleep 1
 done
 
