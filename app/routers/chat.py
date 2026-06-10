@@ -79,6 +79,10 @@ def _process_chat_request(
     background_tasks.add_task(save_message_to_db, db, conversation.id, RoleEnum.user, content, image_filename)
 
     def stream_generator():
+        # Instantly send the conversation_id back to the client so the frontend
+        # doesn't have to make a separate GET request!
+        yield f"data: {json.dumps({'conversation_id': str(conversation.id), 'title': conversation.title})}\n\n"
+        
         full_response = []
         try:
             for chunk in generate_chat_response_stream(
