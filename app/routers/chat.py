@@ -1,18 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, Form
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from uuid import UUID
 from typing import Optional
 import base64
+import json
 
 from app.database import get_db
 from app.models import Conversation, Message, RoleEnum
-from app.schemas import ChatResponse
 from app.core.security import verify_session_jwt
-from app.services.ollama_service import generate_chat_response
+from app.services.ollama_service import generate_chat_response_stream
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
-@router.post("", response_model=ChatResponse)
+@router.post("")
 def handle_chat(
     content: str = Form(..., description="The text message for the AI"),
     image: Optional[UploadFile] = File(None, description="Optional image file to upload"),
@@ -61,25 +62,25 @@ def handle_chat(
     
     ollama_messages = [{"role": msg.role.value, "content": msg.content} for msg in history]
 
-    try:
-        ai_response_text = generate_chat_response(messages=ollama_messages, image_base64=image_base64)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Inference error: {str(e)}")
+    def stream_generator():
+        full_response = []
+        try:
+            for chunk in generate_chat_response_stream(messages=ollama_messages, image_base64=image_base64):
+                full_response.append(chunk)
+                # Format as Server-Sent Event (SSE)
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            return
 
-    # Save AI message
-    ai_message = Message(
-        conversation_id=conversation.id,
-        role=RoleEnum.assistant,
-        content=ai_response_text
-    )
-    db.add(ai_message)
-    db.commit()
-    db.refresh(ai_message)
+        # Stream finished successfully, save the full message to DB
+        final_text = "".join(full_response)
+        ai_message = Message(
+            conversation_id=conversation.id,
+            role=RoleEnum.assistant,
+            content=final_text
+        )
+        db.add(ai_message)
+        db.commit()
 
-    return ChatResponse(
-        message_id=ai_message.id,
-        conversation_id=conversation.id,
-        role=ai_message.role.value,
-        content=ai_message.content,
-        created_at=ai_message.created_at
-    )
+    return StreamingResponse(stream_generator(), media_type="text/event-stream")
