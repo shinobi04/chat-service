@@ -54,11 +54,9 @@ def _process_chat_request(
 
     # 1. Fast Read: Check LRU Cache
     if conversation.id in conversation_cache:
-        print("⚡️ [LRU Cache] HIT: Loaded conversation history instantly from RAM!")
         ollama_messages = conversation_cache[conversation.id]
     else:
         # Cache Miss: Load from DB once and store in cache
-        print("🐢 [LRU Cache] MISS: Reading from NeonDB and loading into RAM...")
         history = db.query(Message).filter(Message.conversation_id == conversation.id).order_by(Message.created_at.asc()).all()
         ollama_messages = [{"role": msg.role.value, "content": msg.content} for msg in history]
         conversation_cache[conversation.id] = ollama_messages
@@ -75,7 +73,7 @@ def _process_chat_request(
         image_filename = image.filename
 
     # 3. Background DB Write (User)
-    print("🚀 [API] Passing user message to BackgroundTasks to save later...")
+    print("🚀 [API] Passing user message to BackgroundTasks to save later...", flush=True)
     background_tasks.add_task(save_message_to_db, db, conversation.id, RoleEnum.user, content, image_filename)
 
     def stream_generator():
@@ -99,11 +97,10 @@ def _process_chat_request(
         final_text = "".join(full_response)
         
         # 4. Instant Append AI Message to Cache
-        print("⚡️ [LRU Cache] Stream finished! Appending AI response to RAM cache instantly.")
         ollama_messages.append({"role": RoleEnum.assistant.value, "content": final_text})
         
         # 5. Background DB Write (AI)
-        print("🚀 [API] Sending AI response to BackgroundTasks to save to NeonDB...")
+        print("🚀 [API] Sending AI response to BackgroundTasks to save to NeonDB...", flush=True)
         save_message_to_db(db, conversation.id, RoleEnum.assistant, final_text)
 
     return StreamingResponse(stream_generator(), media_type="text/event-stream")
