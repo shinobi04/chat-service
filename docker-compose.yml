@@ -11,6 +11,7 @@ services:
     environment:
       - PULL_HEAVY_MODEL=${PULL_HEAVY_MODEL:-false}
     entrypoint: ["/usr/bin/bash", "/init_ollama.sh"]
+    restart: unless-stopped
     deploy:
       resources:
         reservations:
@@ -29,6 +30,7 @@ services:
       - OLLAMA_BASE_URL=http://ollama:11434
     depends_on:
       - ollama
+    restart: unless-stopped
     volumes:
       - .:/app
 
