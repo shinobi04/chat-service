@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 1800
 
+    # Maximum messages sent to Ollama for context (sliding window)
+    MAX_CONTEXT_MESSAGES: int = 20
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()

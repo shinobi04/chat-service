@@ -97,8 +97,12 @@ async def _process_chat_request(
                 
                 full_response = []
                 try:
+                    # Sliding window: only send the last N messages to Ollama
+                    # Full history stays in cache/DB for the conversations API
+                    context_messages = ollama_messages[-settings.MAX_CONTEXT_MESSAGES:]
+
                     async for chunk in generate_chat_response_stream(
-                        messages=ollama_messages, 
+                        messages=context_messages, 
                         image_base64=image_base64, 
                         model_name=model_name
                     ):
