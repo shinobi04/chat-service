@@ -9,6 +9,11 @@ redis_client = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
 # 1 Hour TTL for inactive conversations to free up memory
 CACHE_TTL = 3600 
 
+def get_conversation_lock(conversation_id):
+    """Returns an async Redis distributed lock for a specific conversation."""
+    # timeout prevents deadlocks if a server crashes during a long LLM stream
+    return redis_client.lock(f"lock:conv:{conversation_id}", timeout=120)
+
 async def get_from_cache(conversation_id):
     """Fetch conversation history from Redis."""
     data = await redis_client.get(str(conversation_id))

@@ -11,7 +11,7 @@ from app.database import get_db
 from app.models import Conversation, Message, RoleEnum
 from app.core.security import verify_session_jwt
 from app.services.ollama_service import generate_chat_response_stream
-from app.services.cache_service import get_from_cache, add_to_cache, append_to_cache_message
+from app.services.cache_service import get_from_cache, add_to_cache, append_to_cache_message, get_conversation_lock
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -55,7 +55,12 @@ async def _process_chat_request(
         await db.commit()
         await db.refresh(conversation)
 
-    # 1. Fast Read: Check Redis Cache
+    # Acquire distributed lock so concurrent requests for the SAME conversation wait in line
+    lock = get_conversation_lock(conversation.id)
+    await lock.acquire()
+
+    try:
+        # 1. Fast Read: Check Redis Cache
     cached_messages = await get_from_cache(conversation.id)
     if cached_messages is not None:
         ollama_messages = cached_messages
@@ -84,35 +89,47 @@ async def _process_chat_request(
     background_tasks.add_task(save_message_to_db, db, conversation.id, RoleEnum.user, content, image_filename)
 
     async def stream_generator():
-        # Instantly send the conversation_id back to the client so the frontend
-        # doesn't have to make a separate GET request!
-        yield f"data: {json.dumps({'conversation_id': str(conversation.id), 'title': conversation.title})}\n\n"
-        
-        full_response = []
         try:
-            async for chunk in generate_chat_response_stream(
-                messages=ollama_messages, 
-                image_base64=image_base64, 
-                model_name=model_name
-            ):
-                full_response.append(chunk)
-                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
-        except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
-            return
+            # Instantly send the conversation_id back to the client so the frontend
+            # doesn't have to make a separate GET request!
+            yield f"data: {json.dumps({'conversation_id': str(conversation.id), 'title': conversation.title})}\n\n"
+            
+            full_response = []
+            try:
+                async for chunk in generate_chat_response_stream(
+                    messages=ollama_messages, 
+                    image_base64=image_base64, 
+                    model_name=model_name
+                ):
+                    full_response.append(chunk)
+                    yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                return
 
-        final_text = "".join(full_response)
-        
-        # 4. Instant Append AI Message to Cache
-        ai_message = {"role": RoleEnum.assistant.value, "content": final_text}
-        ollama_messages.append(ai_message)
-        await append_to_cache_message(conversation.id, ai_message)
-        
-        # 5. Background DB Write (AI)
-        print("🚀 [API] Sending AI response to BackgroundTasks to save to NeonDB...", flush=True)
-        background_tasks.add_task(save_message_to_db, db, conversation.id, RoleEnum.assistant, final_text)
+            final_text = "".join(full_response)
+            
+            # 4. Instant Append AI Message to Cache
+            ai_message = {"role": RoleEnum.assistant.value, "content": final_text}
+            ollama_messages.append(ai_message)
+            await append_to_cache_message(conversation.id, ai_message)
+            
+            # 5. Background DB Write (AI)
+            print("🚀 [API] Sending AI response to BackgroundTasks to save to NeonDB...", flush=True)
+            background_tasks.add_task(save_message_to_db, db, conversation.id, RoleEnum.assistant, final_text)
+
+        finally:
+            # 6. Release lock when the stream finishes or disconnects
+            if await lock.owned():
+                await lock.release()
 
     return StreamingResponse(stream_generator(), media_type="text/event-stream")
+
+    except Exception as e:
+        # If anything fails before we even return the stream, release the lock
+        if await lock.owned():
+            await lock.release()
+        raise e
 
 
 @router.post("")
