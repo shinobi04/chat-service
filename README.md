@@ -90,7 +90,6 @@ This API is designed to be hosted on an E2E Networks NVIDIA L4 Instance. To save
   - **Auth:** Bearer Token (access_token)
   - **Body (Multipart Form-Data):**
     - `content` (string, required)
-    - `image` (file, optional)
   - **Query Parameter:** `?conversation_id=UUID` (optional, pass this to continue an old chat)
   - **Returns:** `text/event-stream`
   - **Purpose:** Standard, lightning-fast text chat using `gemma3:1b`.

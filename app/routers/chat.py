@@ -110,7 +110,6 @@ def _process_chat_request(
 def handle_chat(
     background_tasks: BackgroundTasks,
     content: str = Form(..., description="The text message for the AI"),
-    image: Optional[UploadFile] = File(None, description="Optional image file to upload"),
     conversation_id: Optional[UUID] = Query(None, description="Provide this to continue an existing conversation"),
     db: Session = Depends(get_db),
     session_id: str = Depends(verify_session_jwt)
@@ -118,7 +117,7 @@ def handle_chat(
     """
     Standard endpoint for chat using the fast gemma3:1b model.
     """
-    return _process_chat_request(content, image, conversation_id, db, session_id, "gemma3:1b", background_tasks)
+    return _process_chat_request(content, None, conversation_id, db, session_id, "gemma3:1b", background_tasks)
 
 
 @router.post("/gemma4")
