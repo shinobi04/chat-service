@@ -19,7 +19,14 @@ async_db_url = async_db_url.replace("?&", "?").rstrip("?").rstrip("&")
 
 # Create the SQLAlchemy async engine
 # pool_pre_ping=True helps handle disconnects gracefully
-engine = create_async_engine(async_db_url, pool_pre_ping=True)
+engine = create_async_engine(
+    async_db_url,
+    pool_pre_ping=True,
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
+    pool_timeout=settings.DB_POOL_TIMEOUT,
+    pool_recycle=settings.DB_POOL_RECYCLE,
+)
 
 # Create a configured "AsyncSession" class
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)

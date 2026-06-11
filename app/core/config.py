@@ -4,9 +4,17 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     REDIS_URL: str = "redis://localhost:6379"
+    REDIS_PASSWORD: str = ""
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
+
+    # Database connection pool tuning
+    DB_POOL_SIZE: int = 3
+    DB_MAX_OVERFLOW: int = 5
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 1800
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()
+
