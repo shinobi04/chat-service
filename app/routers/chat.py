@@ -61,69 +61,69 @@ async def _process_chat_request(
 
     try:
         # 1. Fast Read: Check Redis Cache
-    cached_messages = await get_from_cache(conversation.id)
-    if cached_messages is not None:
-        ollama_messages = cached_messages
-    else:
-        # Cache Miss: Load from DB once and store in cache
-        result = await db.execute(select(Message).filter(Message.conversation_id == conversation.id).order_by(Message.created_at.asc()))
-        history = result.scalars().all()
-        ollama_messages = [{"role": msg.role.value, "content": msg.content} for msg in history]
-        await add_to_cache(conversation.id, ollama_messages)
+        cached_messages = await get_from_cache(conversation.id)
+        if cached_messages is not None:
+            ollama_messages = cached_messages
+        else:
+            # Cache Miss: Load from DB once and store in cache
+            result = await db.execute(select(Message).filter(Message.conversation_id == conversation.id).order_by(Message.created_at.asc()))
+            history = result.scalars().all()
+            ollama_messages = [{"role": msg.role.value, "content": msg.content} for msg in history]
+            await add_to_cache(conversation.id, ollama_messages)
 
-    # 2. Instant Append User Message
-    user_message = {"role": RoleEnum.user.value, "content": content}
-    ollama_messages.append(user_message)
-    await append_to_cache_message(conversation.id, user_message)
-    
-    # Process image temporarily for this request only (not saved in Cache)
-    image_base64 = None
-    image_filename = None
-    if image:
-        image_bytes = await image.read()
-        image_base64 = base64.b64encode(image_bytes).decode('utf-8')
-        image_filename = image.filename
+        # 2. Instant Append User Message
+        user_message = {"role": RoleEnum.user.value, "content": content}
+        ollama_messages.append(user_message)
+        await append_to_cache_message(conversation.id, user_message)
+        
+        # Process image temporarily for this request only (not saved in Cache)
+        image_base64 = None
+        image_filename = None
+        if image:
+            image_bytes = await image.read()
+            image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+            image_filename = image.filename
 
-    # 3. Background DB Write (User)
-    print("🚀 [API] Passing user message to BackgroundTasks to save later...", flush=True)
-    background_tasks.add_task(save_message_to_db, db, conversation.id, RoleEnum.user, content, image_filename)
+        # 3. Background DB Write (User)
+        print("🚀 [API] Passing user message to BackgroundTasks to save later...", flush=True)
+        background_tasks.add_task(save_message_to_db, db, conversation.id, RoleEnum.user, content, image_filename)
 
-    async def stream_generator():
-        try:
-            # Instantly send the conversation_id back to the client so the frontend
-            # doesn't have to make a separate GET request!
-            yield f"data: {json.dumps({'conversation_id': str(conversation.id), 'title': conversation.title})}\n\n"
-            
-            full_response = []
+        async def stream_generator():
             try:
-                async for chunk in generate_chat_response_stream(
-                    messages=ollama_messages, 
-                    image_base64=image_base64, 
-                    model_name=model_name
-                ):
-                    full_response.append(chunk)
-                    yield f"data: {json.dumps({'chunk': chunk})}\n\n"
-            except Exception as e:
-                yield f"data: {json.dumps({'error': str(e)})}\n\n"
-                return
+                # Instantly send the conversation_id back to the client so the frontend
+                # doesn't have to make a separate GET request!
+                yield f"data: {json.dumps({'conversation_id': str(conversation.id), 'title': conversation.title})}\n\n"
+                
+                full_response = []
+                try:
+                    async for chunk in generate_chat_response_stream(
+                        messages=ollama_messages, 
+                        image_base64=image_base64, 
+                        model_name=model_name
+                    ):
+                        full_response.append(chunk)
+                        yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+                except Exception as e:
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                    return
 
-            final_text = "".join(full_response)
-            
-            # 4. Instant Append AI Message to Cache
-            ai_message = {"role": RoleEnum.assistant.value, "content": final_text}
-            ollama_messages.append(ai_message)
-            await append_to_cache_message(conversation.id, ai_message)
-            
-            # 5. Background DB Write (AI)
-            print("🚀 [API] Sending AI response to BackgroundTasks to save to NeonDB...", flush=True)
-            background_tasks.add_task(save_message_to_db, db, conversation.id, RoleEnum.assistant, final_text)
+                final_text = "".join(full_response)
+                
+                # 4. Instant Append AI Message to Cache
+                ai_message = {"role": RoleEnum.assistant.value, "content": final_text}
+                ollama_messages.append(ai_message)
+                await append_to_cache_message(conversation.id, ai_message)
+                
+                # 5. Background DB Write (AI)
+                print("🚀 [API] Sending AI response to BackgroundTasks to save to NeonDB...", flush=True)
+                background_tasks.add_task(save_message_to_db, db, conversation.id, RoleEnum.assistant, final_text)
 
-        finally:
-            # 6. Release lock when the stream finishes or disconnects
-            if await lock.owned():
-                await lock.release()
+            finally:
+                # 6. Release lock when the stream finishes or disconnects
+                if await lock.owned():
+                    await lock.release()
 
-    return StreamingResponse(stream_generator(), media_type="text/event-stream")
+        return StreamingResponse(stream_generator(), media_type="text/event-stream")
 
     except Exception as e:
         # If anything fails before we even return the stream, release the lock
