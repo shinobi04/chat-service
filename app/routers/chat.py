@@ -10,6 +10,7 @@ import json
 from app.database import get_db
 from app.models import Conversation, Message, RoleEnum
 from app.core.security import verify_session_jwt
+from app.core.config import settings
 from app.services.ollama_service import generate_chat_response_stream
 from app.services.cache_service import get_from_cache, add_to_cache, append_to_cache_message, get_conversation_lock
 from app.core.rate_limit import limiter
