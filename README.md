@@ -49,11 +49,16 @@ This API is designed to be hosted on an E2E Networks NVIDIA L4 Instance. To save
 3. **Clone & Configure:**
 
    ```bash
+   # Clone your repository
    git clone https://github.com/your-username/chat-service.git
    cd chat-service
+   
+   # Setup environment variables
    cp .env.example .env
    nano .env # Add your NeonDB URL and JWT Secret
    ```
+   
+   *Whenever you make code changes locally, push them to GitHub and run `git pull origin main` in this folder to deploy the updates!*
 
 4. **Initial Download & Test:**
    _Crucial: Do this BEFORE running the auto-start script._
@@ -72,6 +77,28 @@ This API is designed to be hosted on an E2E Networks NVIDIA L4 Instance. To save
    ```
 
 **Done!** From now on, your non-technical team members can simply click **Power On** and **Power Off** on the E2E Dashboard. The API and Docker containers will automatically start and stop with the VM.
+
+### 6. 🌐 Exposing a Public HTTPS URL (For Flutter)
+
+Mobile apps (iOS/Android) strongly enforce secure `https://` connections. While your E2E VM has a public IP address, it only serves raw `http://` on port 8000. 
+
+The fastest and most secure way to expose your API with a free SSL certificate is using **Cloudflare Tunnels** (no firewall configuration needed!):
+
+1. **Install Cloudflared on your E2E VM:**
+   ```bash
+   curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+   sudo dpkg -i cloudflared.deb
+   ```
+
+2. **Start a temporary tunnel:**
+   ```bash
+   cloudflared tunnel --url http://localhost:8000
+   ```
+
+3. **Get your URL:**
+   Cloudflare will output a random, secure URL in the terminal (e.g., `https://rapid-fox.trycloudflare.com`). Copy this and paste it into your Flutter app as the backend URL!
+
+*(For a permanent production URL, you can log into the Cloudflare Dashboard, create a permanent tunnel, and attach it to your own custom domain).*
 
 ---
 
