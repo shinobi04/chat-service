@@ -57,6 +57,13 @@ This API is designed to be hosted on an E2E Networks NVIDIA L4 Instance. To save
    sudo systemctl restart docker
    ```
 
+   **Verify GPU Access:**
+   Run this command to test that Docker can successfully communicate with the L4 GPU:
+   ```bash
+   docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
+   ```
+   *(If you see the NVIDIA SMI table output, you are good to go!)*
+
 3. **Clone & Configure:**
 
    ```bash
@@ -68,8 +75,11 @@ This API is designed to be hosted on an E2E Networks NVIDIA L4 Instance. To save
    cp .env.example .env
    nano .env # Add your NeonDB URL and JWT Secret
    ```
-   
-   *Whenever you make code changes locally, push them to GitHub and run `git pull origin main` in this folder to deploy the updates!*
+   *Whenever you make code changes locally, push them to GitHub and run the following in this folder to deploy the updates:*
+   ```bash
+   git pull origin main
+   docker compose up -d --build
+   ```
 
 4. **Initial Download & Test:**
    _Crucial: Do this BEFORE running the auto-start script._
@@ -81,7 +91,16 @@ This API is designed to be hosted on an E2E Networks NVIDIA L4 Instance. To save
 
    > [!TIP]
    > **Will `gemma4:26b` fit on an L4?**
-   > Yes! An NVIDIA L4 GPU has 24GB of VRAM. Ollama automatically pulls the 4-bit quantized version of `gemma4:26b` (~16GB), which fits perfectly and leaves a healthy 8GB buffer for processing context windows and image embeddings.
+   >
+   > In most cases, yes. NVIDIA L4 GPUs provide 24GB of VRAM, and Ollama's quantized version of `gemma4:26b` is typically small enough to run on a single L4.
+   >
+   > Actual memory usage depends on the model version, context window size, concurrent requests, and whether multimodal features are enabled.
+   >
+   > Verify GPU utilization with:
+   >
+   > ```bash
+   > nvidia-smi
+   > ```
 
    _Wait for the download to finish, test the API via Postman or Flutter to ensure it works, and then shut it down with `docker compose down`._
 
