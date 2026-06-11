@@ -1,3 +1,4 @@
+import asyncio
 import ollama
 from typing import List, Dict, Optional, AsyncIterator
 from app.core.config import settings
@@ -6,6 +7,10 @@ from app.core.config import settings
 client = ollama.AsyncClient(host=settings.OLLAMA_BASE_URL)
 
 MODEL_NAME = "gemma3:1b"
+
+# Max 2 concurrent inferences per worker. With 8 workers, this allows 16 concurrent
+# calls to Ollama. The rest wait safely in line without crashing the API or Ollama.
+inference_semaphore = asyncio.Semaphore(2)
 
 async def generate_chat_response_stream(
     messages: List[Dict[str, str]], 
@@ -24,15 +29,16 @@ async def generate_chat_response_stream(
 
     # We add strict options to prevent the model from "blurting" or hallucinating.
     # Lower temperature = more focused and deterministic responses.
-    response_stream = await client.chat(
-        model=model_name, 
-        messages=messages,
-        stream=True,
-        options={
-            "temperature": 0.2,
-            "top_p": 0.9
-        }
-    )
-    
-    async for chunk in response_stream:
-        yield chunk['message']['content']
+    async with inference_semaphore:
+        response_stream = await client.chat(
+            model=model_name, 
+            messages=messages,
+            stream=True,
+            options={
+                "temperature": 0.2,
+                "top_p": 0.9
+            }
+        )
+        
+        async for chunk in response_stream:
+            yield chunk['message']['content']

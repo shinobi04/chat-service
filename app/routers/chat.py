@@ -7,7 +7,7 @@ from typing import Optional
 import base64
 import json
 
-from app.database import get_db
+from app.database import get_db, AsyncSessionLocal
 from app.models import Conversation, Message, RoleEnum
 from app.core.security import verify_session_jwt
 from app.core.config import settings
@@ -17,17 +17,18 @@ from app.core.rate_limit import limiter
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
-async def save_message_to_db(db: AsyncSession, conversation_id: UUID, role: RoleEnum, content: str, image_path: Optional[str] = None):
+async def save_message_to_db(conversation_id: UUID, role: RoleEnum, content: str, image_path: Optional[str] = None):
     """Background task to save a message to the database."""
-    message = Message(
-        conversation_id=conversation_id,
-        role=role,
-        content=content,
-        image_path=image_path
-    )
-    db.add(message)
-    await db.commit()
-    print(f"✅ [Background Task] Successfully saved '{role.value}' message to NeonDB!")
+    async with AsyncSessionLocal() as db:
+        message = Message(
+            conversation_id=conversation_id,
+            role=role,
+            content=content,
+            image_path=image_path
+        )
+        db.add(message)
+        await db.commit()
+        print(f"✅ [Background Task] Successfully saved '{role.value}' message to NeonDB!")
 
 
 async def _process_chat_request(
@@ -88,7 +89,7 @@ async def _process_chat_request(
 
         # 3. Background DB Write (User)
         print("🚀 [API] Passing user message to BackgroundTasks to save later...", flush=True)
-        background_tasks.add_task(save_message_to_db, db, conversation.id, RoleEnum.user, content, image_filename)
+        background_tasks.add_task(save_message_to_db, conversation.id, RoleEnum.user, content, image_filename)
 
         async def stream_generator():
             try:
@@ -122,7 +123,7 @@ async def _process_chat_request(
                 
                 # 5. Background DB Write (AI)
                 print("🚀 [API] Sending AI response to BackgroundTasks to save to NeonDB...", flush=True)
-                background_tasks.add_task(save_message_to_db, db, conversation.id, RoleEnum.assistant, final_text)
+                background_tasks.add_task(save_message_to_db, conversation.id, RoleEnum.assistant, final_text)
 
             finally:
                 # 6. Release lock when the stream finishes or disconnects
