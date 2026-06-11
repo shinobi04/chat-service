@@ -10,7 +10,7 @@ from app.database import get_db
 from app.models import Conversation, Message, RoleEnum
 from app.core.security import verify_session_jwt
 from app.services.ollama_service import generate_chat_response_stream
-from app.services.cache_service import conversation_cache
+from app.services.cache_service import get_from_cache, add_to_cache, append_to_cache_message
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -52,17 +52,20 @@ def _process_chat_request(
         db.commit()
         db.refresh(conversation)
 
-    # 1. Fast Read: Check LRU Cache
-    if conversation.id in conversation_cache:
-        ollama_messages = conversation_cache[conversation.id]
+    # 1. Fast Read: Check Redis Cache
+    cached_messages = get_from_cache(conversation.id)
+    if cached_messages is not None:
+        ollama_messages = cached_messages
     else:
         # Cache Miss: Load from DB once and store in cache
         history = db.query(Message).filter(Message.conversation_id == conversation.id).order_by(Message.created_at.asc()).all()
         ollama_messages = [{"role": msg.role.value, "content": msg.content} for msg in history]
-        conversation_cache[conversation.id] = ollama_messages
+        add_to_cache(conversation.id, ollama_messages)
 
     # 2. Instant Append User Message
-    ollama_messages.append({"role": RoleEnum.user.value, "content": content})
+    user_message = {"role": RoleEnum.user.value, "content": content}
+    ollama_messages.append(user_message)
+    append_to_cache_message(conversation.id, user_message)
     
     # Process image temporarily for this request only (not saved in LRUCache)
     image_base64 = None
@@ -97,7 +100,9 @@ def _process_chat_request(
         final_text = "".join(full_response)
         
         # 4. Instant Append AI Message to Cache
-        ollama_messages.append({"role": RoleEnum.assistant.value, "content": final_text})
+        ai_message = {"role": RoleEnum.assistant.value, "content": final_text}
+        ollama_messages.append(ai_message)
+        append_to_cache_message(conversation.id, ai_message)
         
         # 5. Background DB Write (AI)
         print("🚀 [API] Sending AI response to BackgroundTasks to save to NeonDB...", flush=True)
