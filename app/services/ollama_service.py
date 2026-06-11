@@ -1,19 +1,19 @@
 import ollama
-from typing import List, Dict, Optional, Iterator
+from typing import List, Dict, Optional, AsyncIterator
 from app.core.config import settings
 
-# Initialize ollama client pointing to the OLLAMA_BASE_URL
-client = ollama.Client(host=settings.OLLAMA_BASE_URL)
+# Initialize ollama AsyncClient pointing to the OLLAMA_BASE_URL
+client = ollama.AsyncClient(host=settings.OLLAMA_BASE_URL)
 
 MODEL_NAME = "gemma3:1b"
 
-def generate_chat_response_stream(
+async def generate_chat_response_stream(
     messages: List[Dict[str, str]], 
     image_base64: Optional[str] = None,
     model_name: str = MODEL_NAME
-) -> Iterator[str]:
+) -> AsyncIterator[str]:
     """
-    Sends the conversation history to Ollama and yields the generated text chunks.
+    Sends the conversation history to Ollama and yields the generated text chunks asynchronously.
     messages format: [{"role": "user", "content": "hello"}]
     """
     # If there's an image, attach it to the latest user message
@@ -24,7 +24,7 @@ def generate_chat_response_stream(
 
     # We add strict options to prevent the model from "blurting" or hallucinating.
     # Lower temperature = more focused and deterministic responses.
-    response_stream = client.chat(
+    response_stream = await client.chat(
         model=model_name, 
         messages=messages,
         stream=True,
@@ -34,5 +34,5 @@ def generate_chat_response_stream(
         }
     )
     
-    for chunk in response_stream:
+    async for chunk in response_stream:
         yield chunk['message']['content']

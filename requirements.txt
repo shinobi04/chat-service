@@ -9,3 +9,4 @@ ollama
 python-multipart
 PyJWT
 redis
+asyncpg

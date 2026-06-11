@@ -1,21 +1,24 @@
-from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 from app.core.config import settings
 
-# Create the SQLAlchemy engine
-# pool_pre_ping=True helps handle disconnects gracefully
-engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
+# Safely replace postgresql:// with postgresql+asyncpg:// if needed
+# NeonDB connection strings usually start with postgresql://
+async_db_url = settings.DATABASE_URL
+if async_db_url.startswith("postgresql://"):
+    async_db_url = async_db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-# Create a configured "Session" class
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Create the SQLAlchemy async engine
+# pool_pre_ping=True helps handle disconnects gracefully
+engine = create_async_engine(async_db_url, pool_pre_ping=True)
+
+# Create a configured "AsyncSession" class
+AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 # Base class for declarative models
 Base = declarative_base()
 
-# Dependency for FastAPI to get DB sessions
-def get_db():
-    db = SessionLocal()
-    try:
+# Dependency for FastAPI to get DB async sessions
+async def get_db():
+    async with AsyncSessionLocal() as db:
         yield db
-    finally:
-        db.close()
