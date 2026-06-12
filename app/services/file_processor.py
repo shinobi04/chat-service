@@ -1,12 +1,11 @@
-import io
 import os
 import base64
 import logging
+import tempfile
 from dataclasses import dataclass, field
 from typing import Optional
 
 import fitz  # PyMuPDF
-from faster_whisper import WhisperModel
 from fastapi import UploadFile, HTTPException
 
 from app.core.config import settings
@@ -24,13 +23,14 @@ TEXT_TYPES = {"text/plain", "text/markdown", "text/x-markdown"}
 TEXT_EXTENSIONS = {".md", ".txt", ".markdown"}
 
 # Lazy-loaded Whisper model (loaded on first audio request, then cached)
-_whisper_model: Optional[WhisperModel] = None
+_whisper_model = None
 
 
-def _get_whisper_model() -> WhisperModel:
+def _get_whisper_model():
     """Lazy-load the Whisper model so it doesn't consume memory until needed."""
     global _whisper_model
     if _whisper_model is None:
+        from faster_whisper import WhisperModel
         logger.info("Loading faster-whisper '%s' model...", settings.WHISPER_MODEL_SIZE)
         _whisper_model = WhisperModel(
             settings.WHISPER_MODEL_SIZE,
@@ -143,10 +143,9 @@ def _process_pdf(file_bytes: bytes) -> list[str]:
 
 def _process_audio(file_bytes: bytes, filename: str) -> str:
     """Transcribe audio using faster-whisper and return the transcript text."""
-    import tempfile
-
     # faster-whisper needs a file path, so write to a temp file
     suffix = os.path.splitext(filename)[-1] or ".wav"
+    tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
             tmp.write(file_bytes)
@@ -172,5 +171,5 @@ def _process_audio(file_bytes: bytes, filename: str) -> str:
         logger.exception("Failed to transcribe audio")
         raise HTTPException(status_code=400, detail=f"Failed to transcribe audio: {e}")
     finally:
-        if os.path.exists(tmp_path):
+        if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)
