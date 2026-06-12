@@ -47,7 +47,7 @@ Generates a new zero-latency session and returns a signed JWT.
 ---
 
 ## 3. Standard Text Chat (Streaming)
-Streams an AI response using the fast `gemma3:1b` model. A configurable system prompt is automatically injected before the conversation context.
+Streams an AI response using the fast `gemma3:1b` model.
 
 - **Endpoint:** `POST /chat`
 - **Auth Required:** Yes (Bearer Token)
@@ -59,6 +59,7 @@ Streams an AI response using the fast `gemma3:1b` model. A configurable system p
   - `conversation_id` (UUID, optional): Provide this to continue an existing conversation. Omit to start a new one.
 - **Form Data Body:**
   - `content` (string, required): The user's text message.
+  - `system_prompt` (string, optional): System prompt to set the AI persona for this request.
 
 **Response:** `200 OK` (Content-Type: `text/event-stream`)
 
@@ -93,6 +94,7 @@ Streams an AI response using the larger `gemma4:26b` model. Use this endpoint wh
   - `conversation_id` (UUID, optional): Provide this to continue an existing conversation.
 - **Form Data Body:**
   - `content` (string, required): The user's text message.
+  - `system_prompt` (string, optional): System prompt to set the AI persona for this request.
   - `image` (file, optional): An image file to be analyzed by the vision model.
 
 **Response:** `200 OK` (Content-Type: `text/event-stream`)
@@ -175,18 +177,9 @@ All endpoints return standard HTTP error codes with a JSON body:
 
 ---
 
-## Configuration Notes
+### System Prompt
 
-The AI model behavior can be customized via the `SYSTEM_PROMPT` environment variable in `.env`:
-
-```env
-SYSTEM_PROMPT="You are a pirate. Respond only in pirate speak."
-```
-
-The default system prompt is:
-> *You are a helpful, friendly, and knowledgeable AI assistant. Provide clear, concise, and accurate responses. If you are unsure about something, say so honestly.*
-
-The system prompt is injected at inference time and is not stored in the database, so changes take effect immediately without migration.
+The AI model persona is controlled per-request by the calling backend via the `system_prompt` form field on both `/chat` and `/chat/gemma4`. If omitted, no system prompt is prepended and the model uses its default behavior.
 
 ### IP Whitelisting
 

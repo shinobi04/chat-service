@@ -38,7 +38,8 @@ async def _process_chat_request(
     db: AsyncSession,
     session_id: str,
     model_name: str,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    system_prompt: Optional[str] = None
 ):
     if conversation_id:
         # Validate conversation ownership
@@ -106,7 +107,8 @@ async def _process_chat_request(
                     async for chunk in generate_chat_response_stream(
                         messages=context_messages, 
                         image_base64=image_base64, 
-                        model_name=model_name
+                        model_name=model_name,
+                        system_prompt=system_prompt
                     ):
                         full_response.append(chunk)
                         yield f"data: {json.dumps({'chunk': chunk})}\n\n"
@@ -145,6 +147,7 @@ async def handle_chat(
     request: Request,
     background_tasks: BackgroundTasks,
     content: str = Form(..., description="The text message for the AI"),
+    system_prompt: Optional[str] = Form(None, description="System prompt to set the AI persona for this request"),
     conversation_id: Optional[UUID] = Query(None, description="Provide this to continue an existing conversation"),
     db: AsyncSession = Depends(get_db),
     session_id: str = Depends(verify_session_jwt)
@@ -152,7 +155,7 @@ async def handle_chat(
     """
     Standard endpoint for chat using the fast gemma3:1b model.
     """
-    return await _process_chat_request(content, None, conversation_id, db, session_id, "gemma3:1b", background_tasks)
+    return await _process_chat_request(content, None, conversation_id, db, session_id, "gemma3:1b", background_tasks, system_prompt)
 
 
 @router.post("/gemma4")
@@ -161,6 +164,7 @@ async def handle_chat_gemma4(
     request: Request,
     background_tasks: BackgroundTasks,
     content: str = Form(..., description="The text message for the AI"),
+    system_prompt: Optional[str] = Form(None, description="System prompt to set the AI persona for this request"),
     image: Optional[UploadFile] = File(None, description="Optional image file to upload"),
     conversation_id: Optional[UUID] = Query(None, description="Provide this to continue an existing conversation"),
     db: AsyncSession = Depends(get_db),
@@ -169,4 +173,4 @@ async def handle_chat_gemma4(
     """
     Dedicated endpoint for heavy image-processing using the gemma4:26b model.
     """
-    return await _process_chat_request(content, image, conversation_id, db, session_id, "gemma4:26b", background_tasks)
+    return await _process_chat_request(content, image, conversation_id, db, session_id, "gemma4:26b", background_tasks, system_prompt)

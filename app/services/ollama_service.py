@@ -15,7 +15,8 @@ inference_semaphore = asyncio.Semaphore(2)
 async def generate_chat_response_stream(
     messages: List[Dict[str, str]], 
     image_base64: Optional[str] = None,
-    model_name: str = MODEL_NAME
+    model_name: str = MODEL_NAME,
+    system_prompt: Optional[str] = None
 ) -> AsyncIterator[str]:
     """
     Sends the conversation history to Ollama and yields the generated text chunks asynchronously.
@@ -27,8 +28,10 @@ async def generate_chat_response_stream(
         if last_msg["role"] == "user":
             last_msg["images"] = [image_base64]
 
-    # Prepend system prompt so the model always has persona context
-    full_messages = [{"role": "system", "content": settings.SYSTEM_PROMPT}] + messages
+    # Prepend system prompt if provided by the calling backend
+    full_messages = messages
+    if system_prompt:
+        full_messages = [{"role": "system", "content": system_prompt}] + messages
     async with inference_semaphore:
         response_stream = await client.chat(
             model=model_name, 
