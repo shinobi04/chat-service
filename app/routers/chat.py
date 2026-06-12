@@ -3,8 +3,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from uuid import UUID
-from typing import Optional
-import base64
+from typing import Optional, List
 import json
 
 from app.database import get_db, AsyncSessionLocal
@@ -13,6 +12,7 @@ from app.core.security import verify_session_jwt
 from app.core.config import settings
 from app.services.ollama_service import generate_chat_response_stream
 from app.services.cache_service import get_from_cache, add_to_cache, append_to_cache_message, get_conversation_lock
+from app.services.file_processor import process_file, ProcessedFile
 from app.core.rate_limit import limiter
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -33,7 +33,7 @@ async def save_message_to_db(conversation_id: UUID, role: RoleEnum, content: str
 
 async def _process_chat_request(
     content: str,
-    image: Optional[UploadFile],
+    file: Optional[UploadFile],
     conversation_id: Optional[UUID],
     db: AsyncSession,
     session_id: str,
@@ -41,6 +41,21 @@ async def _process_chat_request(
     background_tasks: BackgroundTasks,
     system_prompt: Optional[str] = None
 ):
+    # --- Process the uploaded file (if any) ---
+    images_base64: List[str] = []
+    file_label: Optional[str] = None
+
+    if file:
+        processed: ProcessedFile = await process_file(file)
+        file_label = processed.original_filename
+
+        if processed.images_base64:
+            images_base64 = processed.images_base64
+
+        if processed.extracted_text:
+            # Prepend extracted text (audio transcript / markdown) to the user's message
+            content = f"{processed.extracted_text}\n\n{content}"
+
     if conversation_id:
         # Validate conversation ownership
         result = await db.execute(select(Conversation).filter(
@@ -79,23 +94,14 @@ async def _process_chat_request(
         user_message = {"role": RoleEnum.user.value, "content": content}
         ollama_messages.append(user_message)
         await append_to_cache_message(conversation.id, user_message)
-        
-        # Process image temporarily for this request only (not saved in Cache)
-        image_base64 = None
-        image_filename = None
-        if image:
-            image_bytes = await image.read()
-            image_base64 = base64.b64encode(image_bytes).decode('utf-8')
-            image_filename = image.filename
 
         # 3. Background DB Write (User)
         print("🚀 [API] Passing user message to BackgroundTasks to save later...", flush=True)
-        background_tasks.add_task(save_message_to_db, conversation.id, RoleEnum.user, content, image_filename)
+        background_tasks.add_task(save_message_to_db, conversation.id, RoleEnum.user, content, file_label)
 
         async def stream_generator():
             try:
-                # Instantly send the conversation_id back to the client so the frontend
-                # doesn't have to make a separate GET request!
+                # Instantly send the conversation_id back to the calling service
                 yield f"data: {json.dumps({'conversation_id': str(conversation.id), 'title': conversation.title})}\n\n"
                 
                 full_response = []
@@ -106,7 +112,7 @@ async def _process_chat_request(
 
                     async for chunk in generate_chat_response_stream(
                         messages=context_messages, 
-                        image_base64=image_base64, 
+                        images_base64=images_base64 or None,
                         model_name=model_name,
                         system_prompt=system_prompt
                     ):
@@ -165,12 +171,14 @@ async def handle_chat_gemma4(
     background_tasks: BackgroundTasks,
     content: str = Form(..., description="The text message for the AI"),
     system_prompt: Optional[str] = Form(None, description="System prompt to set the AI persona for this request"),
-    image: Optional[UploadFile] = File(None, description="Optional image file to upload"),
+    file: Optional[UploadFile] = File(None, description="File to process: image, PDF, audio (mp3/wav/ogg), or text/markdown"),
     conversation_id: Optional[UUID] = Query(None, description="Provide this to continue an existing conversation"),
     db: AsyncSession = Depends(get_db),
     session_id: str = Depends(verify_session_jwt)
 ):
     """
-    Dedicated endpoint for heavy image-processing using the gemma4:26b model.
+    Dedicated endpoint for heavy processing using the gemma4:26b model.
+    Supports images, multi-page PDFs, audio files, and markdown/text files.
     """
-    return await _process_chat_request(content, image, conversation_id, db, session_id, "gemma4:26b", background_tasks, system_prompt)
+    return await _process_chat_request(content, file, conversation_id, db, session_id, "gemma4:26b", background_tasks, system_prompt)
+
