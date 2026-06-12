@@ -2,6 +2,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 from uuid import UUID
 
 from app.database import get_db
@@ -33,13 +34,18 @@ async def get_conversation(
     session_id: str = Depends(verify_session_jwt)
 ):
     """Fetch the history of a specific conversation."""
-    result = await db.execute(select(Conversation).filter(
-        Conversation.id == conversation_id,
-        Conversation.session_id == session_id
-    ))
+    result = await db.execute(
+        select(Conversation)
+        .options(selectinload(Conversation.messages))
+        .filter(
+            Conversation.id == conversation_id,
+            Conversation.session_id == session_id
+        )
+    )
     conversation = result.scalars().first()
 
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     return conversation
+

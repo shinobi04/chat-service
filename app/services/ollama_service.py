@@ -27,12 +27,12 @@ async def generate_chat_response_stream(
         if last_msg["role"] == "user":
             last_msg["images"] = [image_base64]
 
-    # We add strict options to prevent the model from "blurting" or hallucinating.
-    # Lower temperature = more focused and deterministic responses.
+    # Prepend system prompt so the model always has persona context
+    full_messages = [{"role": "system", "content": settings.SYSTEM_PROMPT}] + messages
     async with inference_semaphore:
         response_stream = await client.chat(
             model=model_name, 
-            messages=messages,
+            messages=full_messages,
             stream=True,
             options={
                 "temperature": 0.2,

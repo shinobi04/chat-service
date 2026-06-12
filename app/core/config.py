@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     # Maximum messages sent to Ollama for context (sliding window)
     MAX_CONTEXT_MESSAGES: int = 20
 
+    # System prompt sent to Ollama at the start of every conversation
+    SYSTEM_PROMPT: str = (
+        "You are a helpful, friendly, and knowledgeable AI assistant. "
+        "Provide clear, concise, and accurate responses. "
+        "If you are unsure about something, say so honestly."
+    )
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()
