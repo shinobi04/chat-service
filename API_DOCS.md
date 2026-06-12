@@ -81,8 +81,8 @@ data: {"error": "An internal error occurred."}
 
 ---
 
-## 4. Heavy Vision Chat (Streaming)
-Streams an AI response using the larger `gemma4:26b` model. Use this endpoint when an image needs to be analyzed.
+## 4. Multi-File Chat (Streaming)
+Streams an AI response using the larger `gemma4:26b` model. Supports images, multi-page PDFs, audio files, and text/markdown files.
 
 - **Endpoint:** `POST /chat/gemma4`
 - **Auth Required:** Yes (Bearer Token)
@@ -93,9 +93,18 @@ Streams an AI response using the larger `gemma4:26b` model. Use this endpoint wh
 - **Query Parameters:**
   - `conversation_id` (UUID, optional): Provide this to continue an existing conversation.
 - **Form Data Body:**
-  - `content` (string, required): The user's text message.
+  - `content` (string, required): The text message for the AI.
   - `system_prompt` (string, optional): System prompt to set the AI persona for this request.
-  - `image` (file, optional): An image file to be analyzed by the vision model.
+  - `file` (file, optional): A file to process. Supported types and behavior:
+
+    | File Type | Formats | Processing |
+    |-----------|---------|------------|
+    | **Image** | jpeg, png, webp, gif | Sent directly to Gemma4 vision |
+    | **PDF** | .pdf (multi-page) | Each page rendered as an image (max 20 pages) and sent to Gemma4 |
+    | **Audio** | mp3, wav, ogg, m4a, flac, aac | Transcribed via Whisper, transcript prepended to `content` |
+    | **Text** | .md, .txt, .markdown | Read as UTF-8 text, prepended to `content` |
+
+- **File Size Limit:** 50MB (configurable via `MAX_FILE_SIZE_MB`)
 
 **Response:** `200 OK` (Content-Type: `text/event-stream`)
 
