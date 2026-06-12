@@ -2,7 +2,7 @@
 
 Base URL: `http://localhost:8000` (or your E2E Networks IP)
 
-This API uses **Zero-Latency Sessions**. You do not need to build a complex login system. Instead, call `POST /sessions` on the first app launch to receive a permanent guest token. Include this token in the `Authorization` header for all subsequent requests.
+This is a **backend-to-backend** service. Only whitelisted server IPs can access the API (configured via `ALLOWED_IPS`). It uses **Zero-Latency Sessions** — call `POST /sessions` once from your backend to receive a signed JWT, then include it in the `Authorization` header for all subsequent requests.
 
 All authenticated endpoints require the header:
 ```
@@ -62,7 +62,7 @@ Streams an AI response using the fast `gemma3:1b` model. A configurable system p
 
 **Response:** `200 OK` (Content-Type: `text/event-stream`)
 
-The stream yields the conversation metadata first, followed by text chunks:
+The stream yields the conversation metadata first, followed by text chunks. Your calling service should read the SSE `data:` blocks:
 ```text
 data: {"conversation_id": "123e4567-e89b-12d3-a456-426614174000", "title": "Your first message"}
 
@@ -81,7 +81,7 @@ data: {"error": "An internal error occurred."}
 ---
 
 ## 4. Heavy Vision Chat (Streaming)
-Streams an AI response using the larger `gemma4:26b` model. Use this endpoint when the user uploads an image for analysis.
+Streams an AI response using the larger `gemma4:26b` model. Use this endpoint when an image needs to be analyzed.
 
 - **Endpoint:** `POST /chat/gemma4`
 - **Auth Required:** Yes (Bearer Token)
@@ -190,7 +190,7 @@ The system prompt is injected at inference time and is not stored in the databas
 
 ### IP Whitelisting
 
-Restrict API access to specific IPs via the `ALLOWED_IPS` environment variable. Comma-separated, no spaces required:
+Since this is a backend-to-backend service, access is restricted by IP. Configure the `ALLOWED_IPS` environment variable with a comma-separated list of trusted server IPs:
 
 ```env
 ALLOWED_IPS=192.168.65.1,172.18.0.4,203.0.113.10,10.0.0.5
@@ -199,14 +199,3 @@ ALLOWED_IPS=192.168.65.1,172.18.0.4,203.0.113.10,10.0.0.5
 - **Empty value (default):** All IPs are allowed (development mode).
 - **When set:** Only listed IPs can access the API. All others receive `403 Forbidden`.
 - **Exempt paths:** `/health`, `/docs`, `/openapi.json`, and `/redoc` are always accessible regardless of whitelist (for load balancers and monitoring).
-
-### CORS Origins
-
-Control which frontend origins can make cross-origin requests via the `CORS_ORIGINS` environment variable:
-
-```env
-CORS_ORIGINS=https://my-app.example.com,https://staging.example.com
-```
-
-- **Default:** `*` (all origins — development only).
-- **Production:** Set this to your actual frontend domain(s).

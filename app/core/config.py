@@ -13,10 +13,6 @@ class Settings(BaseSettings):
     # Example: "203.0.113.10,198.51.100.5,172.18.0.4"
     ALLOWED_IPS: str = ""
 
-    # Comma-separated list of allowed CORS origins.
-    # Use "*" for development only.
-    CORS_ORIGINS: str = "*"
-
     # Database connection pool tuning
     DB_POOL_SIZE: int = 3
     DB_MAX_OVERFLOW: int = 5
