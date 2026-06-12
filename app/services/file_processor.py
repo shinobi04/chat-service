@@ -85,14 +85,16 @@ async def process_file(file: UploadFile) -> ProcessedFile:
     file_type = _detect_file_type(file)
     result = ProcessedFile(original_filename=file.filename)
 
+    import asyncio
+
     if file_type == "image":
         result.images_base64 = [base64.b64encode(file_bytes).decode("utf-8")]
 
     elif file_type == "pdf":
-        result.images_base64 = _process_pdf(file_bytes)
+        result.images_base64 = await asyncio.to_thread(_process_pdf, file_bytes)
 
     elif file_type == "audio":
-        result.extracted_text = _process_audio(file_bytes, file.filename or "audio.wav")
+        result.extracted_text = await asyncio.to_thread(_process_audio, file_bytes, file.filename or "audio.wav")
 
     elif file_type == "text":
         try:
