@@ -14,7 +14,7 @@ inference_semaphore = asyncio.Semaphore(2)
 
 async def generate_chat_response_stream(
     messages: List[Dict[str, str]], 
-    image_base64: Optional[str] = None,
+    images_base64: Optional[List[str]] = None,
     model_name: str = MODEL_NAME,
     system_prompt: Optional[str] = None
 ) -> AsyncIterator[str]:
@@ -22,11 +22,11 @@ async def generate_chat_response_stream(
     Sends the conversation history to Ollama and yields the generated text chunks asynchronously.
     messages format: [{"role": "user", "content": "hello"}]
     """
-    # If there's an image, attach it to the latest user message
-    if image_base64 and len(messages) > 0:
+    # If there are images (single image or multi-page PDF), attach to the latest user message
+    if images_base64 and len(messages) > 0:
         last_msg = messages[-1]
         if last_msg["role"] == "user":
-            last_msg["images"] = [image_base64]
+            last_msg["images"] = images_base64
 
     # Prepend system prompt if provided by the calling backend
     full_messages = messages
