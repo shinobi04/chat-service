@@ -11,3 +11,5 @@ PyJWT
 redis
 asyncpg
 slowapi
+pymupdf
+faster-whisper

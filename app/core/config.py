@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 1800
 
+    # File processing limits
+    MAX_FILE_SIZE_MB: int = 50              # Max upload size in MB
+    MAX_PDF_PAGES: int = 20                 # Max pages to render from a PDF
+    WHISPER_MODEL_SIZE: str = "base"        # faster-whisper model: tiny, base, small, medium, large
+
     # Maximum messages sent to Ollama for context (sliding window)
     MAX_CONTEXT_MESSAGES: int = 20
 
