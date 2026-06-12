@@ -4,7 +4,6 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from app.core.rate_limit import limiter
-from app.core.config import settings
 from app.core.ip_whitelist import IPWhitelistMiddleware
 from app.routers import sessions, chat, conversations
 
