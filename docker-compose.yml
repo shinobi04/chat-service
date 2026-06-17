@@ -3,6 +3,7 @@ version: "3.8"
 services:
   ollama:
     image: ollama/ollama:latest
+    container_name: chat-service_ollama_1
     expose:
       - "11434"
     volumes:
@@ -10,18 +11,15 @@ services:
       - ./init_ollama.sh:/init_ollama.sh
     environment:
       - PULL_HEAVY_MODEL=${PULL_HEAVY_MODEL:-false}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    runtime: nvidia
     entrypoint: ["/usr/bin/bash", "/init_ollama.sh"]
     restart: unless-stopped
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
 
   redis:
     image: redis:alpine
+    container_name: chat-service_redis_1
     command: redis-server --requirepass ${REDIS_PASSWORD}
     expose:
       - "6379"
@@ -29,6 +27,7 @@ services:
 
   app:
     build: .
+    container_name: chat-service_app_1
     ports:
       - "8000:8000"
     env_file:
