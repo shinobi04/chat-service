@@ -39,9 +39,20 @@ This API is designed to be hosted on an E2E Networks NVIDIA L4 Instance. To save
    sudo ufw allow https
    echo "y" | sudo ufw enable
 
+   # Add Docker's official GPG key & repository
+   sudo apt-get update
+   sudo apt-get install -y ca-certificates curl
+   sudo install -m 0755 -d /etc/apt/keyrings
+   sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+   sudo chmod a+r /etc/apt/keyrings/docker.asc
+   echo \
+     "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+     $(. /etc/os-release && echo \"\$VERSION_CODENAME\") stable" | \
+     sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
    # Install Docker & Docker Compose Plugin
    sudo apt-get update
-   sudo apt-get install -y docker.io docker-buildx-plugin docker-compose-plugin
+   sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
    # Install NVIDIA Container Toolkit
    curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
@@ -51,7 +62,7 @@ This API is designed to be hosted on an E2E Networks NVIDIA L4 Instance. To save
 
    sudo apt-get update
    sudo apt-get install -y nvidia-container-toolkit
-   
+
    # Configure Docker to use NVIDIA runtime
    sudo nvidia-ctk runtime configure --runtime=docker
    sudo systemctl restart docker
@@ -59,10 +70,12 @@ This API is designed to be hosted on an E2E Networks NVIDIA L4 Instance. To save
 
    **Verify GPU Access:**
    Run this command to test that Docker can successfully communicate with the L4 GPU:
+
    ```bash
    docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
    ```
-   *(If you see the NVIDIA SMI table output, you are good to go!)*
+
+   _(If you see the NVIDIA SMI table output, you are good to go!)_
 
 3. **Clone & Configure:**
 
@@ -70,12 +83,14 @@ This API is designed to be hosted on an E2E Networks NVIDIA L4 Instance. To save
    # Clone your repository
    git clone https://github.com/your-username/chat-service.git
    cd chat-service
-   
+
    # Setup environment variables
    cp .env.example .env
    nano .env # Add your NeonDB URL and JWT Secret
    ```
-   *Whenever you make code changes locally, push them to GitHub and run the following in this folder to deploy the updates:*
+
+   _Whenever you make code changes locally, push them to GitHub and run the following in this folder to deploy the updates:_
+
    ```bash
    git pull origin main
    docker compose up -d --build
@@ -114,12 +129,13 @@ This API is designed to be hosted on an E2E Networks NVIDIA L4 Instance. To save
 
 ### 6. 🌐 Exposing a Public HTTPS URL for Production
 
-Mobile apps (iOS/Android) strongly enforce secure `https://` connections. While your E2E VM has a public IP address, it only serves raw `http://` on port 8000. 
+Mobile apps (iOS/Android) strongly enforce secure `https://` connections. While your E2E VM has a public IP address, it only serves raw `http://` on port 8000.
 
 For a production environment, you should use one of the following methods to create a permanent, secure connection:
 
 **Option A: NGINX + Certbot (Recommended for Public E2E IPs)**
 Since E2E provides a static public IP, you can map your domain directly to it.
+
 1. Map your domain's A-Record to the E2E Public IP.
 2. Install NGINX and Certbot:
    ```bash
@@ -128,11 +144,12 @@ Since E2E provides a static public IP, you can map your domain directly to it.
 3. Set up a reverse proxy in `/etc/nginx/sites-available/default` that forwards port `80` to `localhost:8000`.
 4. Run Certbot to generate the free SSL certificate:
    ```bash
-   sudo certbot --nginx -d api.yourdomain.com
+   sudo certbot --nginx -d api.intelligence.exanor.com
    ```
 
 **Option B: Permanent Cloudflare Tunnel (No open ports needed)**
 If you prefer not to manage NGINX or SSL certificates manually:
+
 1. Log into your Cloudflare Dashboard and navigate to **Zero Trust > Networks > Tunnels**.
 2. Create a new tunnel and follow the instructions to install the `cloudflared` connector on your VM.
 3. Route a public hostname (e.g., `api.yourdomain.com`) to `http://localhost:8000`. Cloudflare will handle the SSL entirely!
