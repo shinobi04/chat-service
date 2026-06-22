@@ -46,7 +46,7 @@ Generates a new zero-latency session and returns a signed JWT.
 
 ---
 
-## 3. Standard Text Chat (Streaming)
+## 3. Standard Text Chat
 Streams an AI response using the fast `gemma3:1b` model.
 
 - **Endpoint:** `POST /chat`
@@ -59,9 +59,10 @@ Streams an AI response using the fast `gemma3:1b` model.
   - `conversation_id` (UUID, optional): Provide this to continue an existing conversation. Omit to start a new one.
 - **Form Data Body:**
   - `content` (string, required): The user's text message.
-  - `system_prompt` (string, optional): System prompt to set the AI persona for this request.
+  - `system_prompt` (string, optional): System prompt to set the AI persona. **Note:** This is not persisted; the client must send it on *every* request in a conversation for the persona to be maintained.
+  - `stream` (boolean, optional): Whether to stream the response (`true`, default) or return a single JSON object (`false`).
 
-**Response:** `200 OK` (Content-Type: `text/event-stream`)
+**Response if `stream=true` (Default):** `200 OK` (Content-Type: `text/event-stream`)
 
 The stream yields the conversation metadata first, followed by text chunks. Your calling service should read the SSE `data:` blocks:
 ```text
@@ -74,6 +75,15 @@ data: {"chunk": " there"}
 data: {"chunk": "!"}
 ```
 
+**Response if `stream=false`:** `200 OK` (Content-Type: `application/json`)
+```json
+{
+  "conversation_id": "123e4567-e89b-12d3-a456-426614174000",
+  "title": "Your first message",
+  "content": "Hello there!"
+}
+```
+
 **Error during stream:**
 ```text
 data: {"error": "An internal error occurred."}
@@ -81,7 +91,7 @@ data: {"error": "An internal error occurred."}
 
 ---
 
-## 4. Multi-File Chat (Streaming)
+## 4. Multi-File Chat
 Streams an AI response using the larger `gemma4:26b` model. Supports images, multi-page PDFs, audio files, and text/markdown files.
 
 - **Endpoint:** `POST /chat/gemma4`
@@ -94,7 +104,7 @@ Streams an AI response using the larger `gemma4:26b` model. Supports images, mul
   - `conversation_id` (UUID, optional): Provide this to continue an existing conversation.
 - **Form Data Body:**
   - `content` (string, required): The text message for the AI.
-  - `system_prompt` (string, optional): System prompt to set the AI persona for this request.
+  - `system_prompt` (string, optional): System prompt to set the AI persona. **Note:** This is not persisted; the client must send it on *every* request in a conversation for the persona to be maintained.
   - `file` (file, optional): A file to process. Supported types and behavior:
 
     | File Type | Formats | Processing |
@@ -106,9 +116,9 @@ Streams an AI response using the larger `gemma4:26b` model. Supports images, mul
 
 - **File Size Limit:** 50MB (configurable via `MAX_FILE_SIZE_MB`)
 
-**Response:** `200 OK` (Content-Type: `text/event-stream`)
+**Response:** `200 OK` 
 
-*(Follows the exact same streaming format as standard chat above.)*
+*(Follows the exact same streaming or JSON response format as standard chat above, depending on the `stream` parameter.)*
 
 ---
 
@@ -188,7 +198,7 @@ All endpoints return standard HTTP error codes with a JSON body:
 
 ### System Prompt
 
-The AI model persona is controlled per-request by the calling backend via the `system_prompt` form field on both `/chat` and `/chat/gemma4`. If omitted, no system prompt is prepended and the model uses its default behavior.
+The AI model persona is controlled per-request by the calling backend via the `system_prompt` form field on both `/chat` and `/chat/gemma4`. **This parameter is not persisted in the backend database.** If you want the AI to maintain a specific persona throughout an entire conversation, the client must include the `system_prompt` form field with *every* message sent to the API. If omitted on subsequent requests, no system prompt is prepended and the model will fall back to its default behavior for that specific message.
 
 ### IP Whitelisting
 

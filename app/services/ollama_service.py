@@ -45,3 +45,34 @@ async def generate_chat_response_stream(
         
         async for chunk in response_stream:
             yield chunk['message']['content']
+
+async def generate_chat_response(
+    messages: List[Dict[str, str]], 
+    images_base64: Optional[List[str]] = None,
+    model_name: str = MODEL_NAME,
+    system_prompt: Optional[str] = None
+) -> str:
+    """
+    Sends the conversation history to Ollama and returns the complete generated text asynchronously.
+    """
+    if images_base64 and len(messages) > 0:
+        last_msg = messages[-1]
+        if last_msg["role"] == "user":
+            last_msg["images"] = images_base64
+
+    full_messages = messages
+    if system_prompt:
+        full_messages = [{"role": "system", "content": system_prompt}] + messages
+        
+    async with inference_semaphore:
+        response = await client.chat(
+            model=model_name, 
+            messages=full_messages,
+            stream=False,
+            options={
+                "temperature": 0.2,
+                "top_p": 0.9
+            }
+        )
+        
+        return response['message']['content']
