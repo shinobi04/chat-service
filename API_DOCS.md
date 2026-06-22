@@ -33,7 +33,7 @@ Generates a new zero-latency session and returns a signed JWT.
 
 - **Endpoint:** `POST /sessions`
 - **Auth Required:** No
-- **Rate Limit:** 10 requests/minute per IP
+- **Rate Limit:** 60 requests/minute per IP
 
 **Response:** `200 OK`
 ```json
@@ -51,7 +51,7 @@ Streams an AI response using the fast `gemma3:1b` model.
 
 - **Endpoint:** `POST /chat`
 - **Auth Required:** Yes (Bearer Token)
-- **Rate Limit:** 20 requests/minute per IP
+- **Rate Limit:** 60 requests/minute per Conversation (falls back to per IP for new conversations)
 - **Headers:**
   - `Authorization: Bearer <your_access_token>`
   - `Content-Type: multipart/form-data`
@@ -96,7 +96,7 @@ Streams an AI response using the larger `gemma4:26b` model. Supports images, mul
 
 - **Endpoint:** `POST /chat/gemma4`
 - **Auth Required:** Yes (Bearer Token)
-- **Rate Limit:** 5 requests/minute per IP
+- **Rate Limit:** 20 requests/minute per Conversation (falls back to per IP for new conversations)
 - **Headers:**
   - `Authorization: Bearer <your_access_token>`
   - `Content-Type: multipart/form-data`
@@ -127,7 +127,7 @@ Retrieves a list of all conversation threads for the authenticated session, orde
 
 - **Endpoint:** `GET /conversations`
 - **Auth Required:** Yes (Bearer Token)
-- **Rate Limit:** 30 requests/minute per IP
+- **Rate Limit:** 100 requests/minute per IP
 
 **Response:** `200 OK`
 ```json
@@ -148,7 +148,7 @@ Retrieves the full message history for a specific conversation.
 
 - **Endpoint:** `GET /conversations/{conversation_id}`
 - **Auth Required:** Yes (Bearer Token)
-- **Rate Limit:** 30 requests/minute per IP
+- **Rate Limit:** 100 requests/minute per Conversation
 - **Path Parameters:**
   - `conversation_id` (UUID, required): The ID of the conversation to load.
 

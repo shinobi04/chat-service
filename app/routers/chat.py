@@ -178,7 +178,7 @@ async def _process_chat_request(
 
 
 @router.post("")
-@limiter.limit("20/minute")
+@limiter.limit("60/minute")
 async def handle_chat(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -196,7 +196,7 @@ async def handle_chat(
 
 
 @router.post("/gemma4")
-@limiter.limit("5/minute")
+@limiter.limit("20/minute")
 async def handle_chat_gemma4(
     request: Request,
     background_tasks: BackgroundTasks,

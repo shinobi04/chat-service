@@ -7,7 +7,7 @@ from app.core.rate_limit import limiter
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 @router.post("", response_model=SessionResponse)
-@limiter.limit("10/minute")
+@limiter.limit("60/minute")
 def create_session(request: Request):
     """Generates a new stateless session UUID and returns a signed JWT."""
     session_id = str(uuid.uuid4())

@@ -14,7 +14,7 @@ from app.core.rate_limit import limiter
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
 @router.get("", response_model=List[ConversationResponse])
-@limiter.limit("30/minute")
+@limiter.limit("100/minute")
 async def get_conversations(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -26,7 +26,7 @@ async def get_conversations(
     return conversations
 
 @router.get("/{conversation_id}", response_model=ConversationDetailResponse)
-@limiter.limit("30/minute")
+@limiter.limit("100/minute")
 async def get_conversation(
     request: Request,
     conversation_id: UUID,
